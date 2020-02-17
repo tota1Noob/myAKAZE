@@ -10,6 +10,29 @@ struct ImgSize {
 	int width;
 };
 
+//Defined struct "Point" for point coordinates storage
+//Notice that x and y are float numbers
+struct Pointf {
+	float x;
+	float y;
+};
+
+//Defined class "KeyPoint" for key point storage
+//This is just a bad knock-off version of "KeyPoint" in OpenCV
+class KeyPoint {
+public:
+	Pointf pt;
+	float size;
+	float angle;
+	float response;
+	int octave;
+	int class_id;
+	KeyPoint();
+	~KeyPoint();
+	KeyPoint(float x, float y, float size, float angle, float response, int octave, int class_id);
+	KeyPoint(Pointf pt, float size, float angle, float response, int octave, int class_id);
+};
+
 //Defined class "Img" for image data storage,
 //where pixel values are kept in a 2D float array "pixels"
 //Number of columns and rows are defined as "cols" and "rows", respectively
@@ -45,6 +68,20 @@ float** gaussian_2D_kernel(int ksize_x, int ksize_y, float sigma);
 //Defined function "gaussian_2D_convolution" for gaussian blurring over a 2D array
 void gaussian_2D_convolution(Img& src, Img& dst, int ksize_x, int ksize_y, float sigma);
 
-//Defined function "image_derivatives_scharr" for the calculation of image derivatives
+//Defined function "sepFilter2D"
+//Works the same way as cv::sepFilter2D, rewritten for the needs of this program
+void sepFilter2D(Img& src, Img& dst, Img& kx, Img& ky);
+
+//Defined function "image_derivatives_scharr" for calculating image derivatives
 //along the specified axis
 void image_derivatives_scharr(Img& src, Img& dst, int xorder, int yorder);
+
+//Defined function "compute_k_percentile" for calculating the value of contrast factor "k"
+float compute_k_percentile(Img& img, float perc, float gscale, int nbins, int ksize_x, int ksize_y);
+
+//Defined function "solve" for solving a 2 * 2 linear system
+//Following Cramer's Rule
+bool solve(Img& a, Img& b, Img& dst);
+
+
+void compute_derivative_kernels(Img kx, Img ky, int dx, int dy, int scale);

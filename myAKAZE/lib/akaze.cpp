@@ -4,6 +4,41 @@
 
 /******************************************************************************************/
 /*Basic classes & functions*/
+
+KeyPoint::KeyPoint() {
+	this->pt.x = -1.;
+	this->pt.y = -1.;
+	this->size = -1.;
+	this->angle = -1.;
+	this->response = 0.;
+	this->octave = 0;
+	this->class_id = -1;
+}
+
+KeyPoint::~KeyPoint() {
+	printf("Deleted KeyPoint (%f, %f).", this->pt.x, this->pt.y);
+}
+
+KeyPoint::KeyPoint(float x, float y, float size, float angle, float response, int octave, int class_id) {
+	this->pt.x = x;
+	this->pt.y = y;
+	this->size = size;
+	this->angle = angle;
+	this->response = response;
+	this->octave = octave;
+	this->class_id = class_id;
+}
+
+KeyPoint::KeyPoint(Pointf pt, float size, float angle, float response, int octave, int class_id) {
+	this->pt.x = pt.x;
+	this->pt.y = pt.y;
+	this->size = size;
+	this->angle = angle;
+	this->response = response;
+	this->octave = octave;
+	this->class_id = class_id;
+}
+
 Img::Img() {
 	this->rows = 0;
 	this->cols = 0;
@@ -29,6 +64,9 @@ Img::Img(int rows, int cols) {
 	this->pixels = new float* [rows];
 	for (int i = 0; i < rows; ++i) {
 		this->pixels[i] = new float[cols];
+		for (int j = 0; j < this->cols; ++j) {
+			pixels[i][j] = 0.0;
+		}
 	}
 }
 
@@ -38,6 +76,9 @@ Img::Img(ImgSize size) {
 	this->pixels = new float* [this->rows];
 	for (int i = 0; i < this->rows; ++i) {
 		this->pixels[i] = new float[this->cols];
+		for (int j = 0; j < this->cols; ++j) {
+			pixels[i][j] = 0.0;
+		}
 	}
 }
 
@@ -288,53 +329,177 @@ void gaussian_2D_convolution(Img& src, Img& dst, int ksize_x, int ksize_y, float
 	delete[] extended;
 }
 
-void image_derivatives_scharr(Img& src, Img& dst, int xorder, int yorder) {
-	float weights[3][3];
-	if (xorder == 1) {
-		weights[0][0] = -3; weights[0][1] = 0; weights[0][2] = 3;
-		weights[1][0] = -10; weights[1][1] = 0; weights[1][2] = 10;
-		weights[2][0] = -3; weights[2][1] = 0; weights[2][2] = 3;
-	}
-	else {
-		weights[0][0] = -3; weights[0][1] = -10; weights[0][2] = -3;
-		weights[1][0] = 0; weights[1][1] = 0; weights[1][2] = 0;
-		weights[2][0] = 3; weights[2][1] = 10; weights[2][2] = 3;
-	}
+void sepFilter2D(Img& src, Img& dst, Img& kx, Img& ky) {
 	int row = src.rows,
 		col = src.cols,
-		newRow = row + 2,
-		newCol = col + 2;
-	float** extended = new float* [newRow];
-	for (int i = 0; i < newRow; ++i) {
-		extended[i] = new float[newCol];
-	}
-	//Copy src data
+		ksize = kx.rows,
+		half = ksize / 2;
+	float sumTmp = 0.;
+	//Calculate with kx
 	for (int i = 0; i < row; ++i) {
 		for (int j = 0; j < col; ++j) {
-			extended[i + 1][j + 1] = src.get(i, j);
-		}
-	}
-	//Replicate borders
-	for (int i = 1; i <= col; ++i) {
-		extended[0][i] = extended[1][i];
-		extended[newRow - 1][i] = extended[newRow - 2][i];
-	}
-	for (int i = 0; i < newRow; ++i) {
-		extended[i][0] = extended[i][1];
-		extended[i][newCol - 1] = extended[i][newCol - 2];
-	}
-	//Perform Scharr
-	float sumTmp = 0.0;
-	for (int i = 0; i < row; ++i) {
-		for (int j = 0; j < col; ++j) {
-			sumTmp = extended[i][j] * weights[0][0] + extended[i][j + 1] * weights[0][1] + extended[i][j + 2] * weights[0][2]
-				+ extended[i + 1][j] * weights[1][0] + extended[i + 1][j + 1] * weights[1][1] + extended[i + 1][j + 2] * weights[1][2]
-				+ extended[i + 2][j] * weights[2][0] + extended[i + 2][j + 1] * weights[2][1] + extended[i + 2][j + 2] * weights[2][2];
+			sumTmp = 0.;
+			if (j - half < 0) {
+				sumTmp += src.get(i, half - j) * kx.get(0, 0);
+			}
+			else {
+				sumTmp += src.get(i, j - half) * kx.get(0, 0);
+			}
+			sumTmp += src.get(i, j) * kx.get(half, 0);
+			if (j + half >= col) {
+				sumTmp += src.get(i, col - half) * kx.get(ksize - 1, 0);
+			}
+			else {
+				sumTmp += src.get(i, j + half) * kx.get(ksize - 1, 0);
+			}
 			dst.ptr(i)[j] = sumTmp;
 		}
 	}
-	for (int i = 0; i < newRow; i++) {
-		delete[] extended[i];
+	//Calculate with ky
+	float aux = 0.;
+	for (int j = 0; j < col; ++j) {
+		for (int i = 0; i < row; ++i) {
+			sumTmp = 0.;
+			if (i - half < 0) {
+				sumTmp += dst.get(half - i, j) * ky.get(0, 0);
+			}
+			else {
+				sumTmp += aux * ky.get(0, 0);
+			}
+			sumTmp += dst.get(i, j) * ky.get(half, 0);
+			if (i + half >= row) {
+				sumTmp += dst.get(row - half, j) * ky.get(ksize - 1, 0);
+			}
+			else {
+				sumTmp += dst.get(i + half, j) * ky.get(ksize - 1, 0);
+			}
+			aux = dst.ptr(i)[j];
+			dst.ptr(i)[j] = sumTmp;
+		}
 	}
-	delete[] extended;
 }
+
+void image_derivatives_scharr(Img& src, Img& dst, int xorder, int yorder) {
+	Img kx(3, 1), ky(3, 1);
+	
+	if (xorder == 1) {
+		kx.ptr(0)[0] = -1; kx.ptr(1)[0] = 0; kx.ptr(2)[0] = 1;
+		ky.ptr(0)[0] = 3; ky.ptr(1)[0] = 10; ky.ptr(2)[0] = 3;
+	}
+	else {
+		kx.ptr(0)[0] = 3; kx.ptr(1)[0] = 10; kx.ptr(2)[0] = 3;
+		ky.ptr(0)[0] = -1; ky.ptr(1)[0] = 0; ky.ptr(2)[0] = 1;
+	}
+	sepFilter2D(src, dst, kx, ky);
+}
+
+float compute_k_percentile(Img& img, float perc, float gscale, int nbins, int ksize_x, int ksize_y) {
+
+	int nbin = 0, pointNum = 0, threshold = 0;
+	float finalK = 0.0, grad = 0.0, pointCount = 0.0, max = 0.0;
+	float* hist = new float[nbins];
+	for (int i = 0; i < nbins; ++i)
+		hist[i] = 0.0;
+
+	Img gaussian(img.rows, img.cols);
+	Img dx(img.rows, img.cols);
+	Img dy(img.rows, img.cols);	
+	gaussian_2D_convolution(img, gaussian, ksize_x, ksize_y, gscale);
+	image_derivatives_scharr(gaussian, dx, 1, 0);
+	image_derivatives_scharr(gaussian, dy, 0, 1);
+
+	// Skip the borders
+	for (int i = 1; i < gaussian.rows - 1; ++i) {
+		const float* dx_row = dx.ptr(i);
+		const float* dy_row = dy.ptr(i);
+		for (int j = 1; j < gaussian.cols - 1; ++j) {
+			grad = sqrt(dx_row[j] * dx_row[j] + dy_row[j] * dy_row[j]);
+			if (grad > max) {
+				max = grad;
+			}
+		}
+	}
+	for (int i = 1; i < gaussian.rows - 1; ++i) {
+		const float* dx_row = dx.ptr(i);
+		const float* dy_row = dy.ptr(i);
+		for (int j = 1; j < gaussian.cols - 1; ++j) {
+			grad = sqrt(dx_row[j] * dx_row[j] + dy_row[j] * dy_row[j]);
+			if (grad != 0.0) {
+				nbin = floor(nbins * (grad / max));
+				if (nbin == nbins) {
+					nbin--;
+				}
+				hist[nbin]++;
+				pointCount++;
+			}
+		}
+	}
+
+	threshold = (int)(pointCount * perc);
+	int i;
+	for (i = 0; pointNum < threshold && i < nbins; ++i) {
+		pointNum = pointNum + hist[i];
+	}
+	if (pointNum < threshold) {
+		finalK = 0.03;
+	}
+	else {
+		finalK = max * ((float)i / (float)nbins);
+	}
+
+	delete[] hist;
+	return finalK;
+}
+
+bool solve(Img& a, Img& b, Img& dst) {
+	float d = a.get(0, 0) * a.get(1, 1) - a.get(0, 1) * a.get(1, 0);
+	if (d != 0.) {
+		dst.ptr(0)[0] = (b.get(0, 0) * a.get(1, 1) - b.get(1, 0) * a.get(0, 1)) / d;
+		dst.ptr(1)[0] = (b.get(1, 0) * a.get(0, 0) - b.get(0, 0) * a.get(1, 0)) / d;
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
+/*void compute_derivative_kernels(Img kx, Img ky, int dx, int dy, int scale) {
+	const int ksize = 3 + 2 * (scale - 1);
+
+	// The usual Scharr kernel
+	if (scale == 1) {
+		cv::getDerivKernels(kx_, ky_, dx, dy, 0, true, CV_32F);
+		return;
+	}
+
+	kx_.create(ksize, 1, CV_32F, -1, true);
+	ky_.create(ksize, 1, CV_32F, -1, true);
+	cv::Mat kx = kx_.getMat();
+	cv::Mat ky = ky_.getMat();
+
+	float w = 10.0 / 3.0;
+	float norm = 1.0 / (2.0 * scale * (w + 2.0));
+
+	for (int k = 0; k < 2; k++) {
+		Img* kernel = k == 0 ? &kx : &ky;
+		int order = k == 0 ? dx : dy;
+		float kerI[1000];
+
+		for (int t = 0; t < ksize; t++)
+			kerI[t] = 0;
+
+		if (order == 0) {
+			kerI[0] = norm;
+			kerI[ksize / 2] = w * norm;
+			kerI[ksize - 1] = norm;
+		}
+		else if (order == 1) {
+			kerI[0] = -1;
+			kerI[ksize / 2] = 0;
+			kerI[ksize - 1] = 1;
+		}
+
+		cv::Mat temp(kernel->rows, kernel->cols, CV_32F, &kerI[0]);
+		temp.copyTo(*kernel);
+	}
+}*/

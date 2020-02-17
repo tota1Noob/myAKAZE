@@ -45,12 +45,36 @@ int main() {
         orgCol = image.cols;
     BYTE* imgTmp = matToBytes(src);
     Img tmp(imgTmp, orgRow, orgCol);
-    //tmp.printImg();
-    Img tmp2(orgRow, orgCol);
-    //gaussian_2D_convolution(tmp, tmp2, 0, 0, 1.0);
-    image_derivatives_scharr(tmp, tmp2, 1, 0);
-    Mat scharr = floatToMat(tmp2.data(), orgRow, orgCol);
-    imshow("mine", scharr);
+    //cout << compute_k_percentile(tmp, 0.7, 1.0, 300, 0, 0) << endl;
+
+    /*Mat kx_, ky_, dst;
+    cv::getDerivKernels(kx_, ky_, 1, 0, 0, true, CV_32F);
+    ky_.ptr<float>(0)[0] = 3.; ky_.ptr<float>(1)[0] = 10; ky_.ptr<float>(2)[0] = 3;
+    cout << kx_ << "\n" << ky_ << endl;
+    cv::sepFilter2D(image, dst, CV_32F, kx_, ky_);
+    imshow("dst", dst);
+
+    Img tmp3(orgRow, orgCol);
+    Img kx(3, 1), ky(3, 1);
+    kx.ptr(0)[0] = -1; kx.ptr(1)[0] = 0; kx.ptr(2)[0] = 1;
+    ky.ptr(0)[0] = 0.09375; ky.ptr(1)[0] = 0.3125; ky.ptr(2)[0] = 0.09375;
+    kx.printImg(); cout << endl;  ky.printImg(); cout << endl;
+    sepFilter2D(tmp, tmp3, kx, ky);
+    cout << tmp3.get(200, 200) << " ";
+    Mat sep = floatToMat(tmp3.data(), orgRow, orgCol);
+    cout << sep.ptr<float>(200)[200] << " " << dst.ptr<float>(200)[200] << endl;
+    imshow("mine", sep);*/
+
+
+
+    /*Img a(2, 2);
+    Img b(2, 1);
+    Img dst(2, 1);
+    a.ptr(0)[0] = 2; a.ptr(0)[1] = 1; a.ptr(1)[0] = 0; a.ptr(1)[1] = 1;
+    b.ptr(0)[0] = 0; b.ptr(1)[0] = 5;
+    solve(a, b, dst);
+    dst.printImg();*/
+
 
     Mat opencvScharr(cv::Size(orgCol, orgRow), CV_32F);
     //cv::GaussianBlur(image, opencvScharr, cv::Size(3, 3), 1.0, 1.0, cv::BORDER_REPLICATE);
@@ -59,7 +83,13 @@ int main() {
     //tmp2.printImg();
     //cout << opencvScharr << endl;
 
-    int x = 32, y = 267;
+    Img tmp2(orgRow, orgCol);
+    //gaussian_2D_convolution(tmp, tmp2, 0, 0, 1.0);
+    image_derivatives_scharr(tmp, tmp2, 1, 0);
+    Mat scharr = floatToMat(tmp2.data(), orgRow, orgCol);
+    imshow("mine", scharr);
+
+    int x = 123, y = 234;
     cout << opencvScharr.ptr<float>(x)[y] << " " << scharr.ptr<float>(x)[y] << " "
         << opencvScharr.ptr<float>(x)[y] / scharr.ptr<float>(x)[y] << endl;
 

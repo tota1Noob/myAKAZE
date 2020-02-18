@@ -21,9 +21,15 @@
     <ClCompile Include="lib\akaze.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="lib\basics.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="lib\akaze.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\basics.h">
       <Filter>源文件</Filter>
     </ClInclude>
   </ItemGroup>

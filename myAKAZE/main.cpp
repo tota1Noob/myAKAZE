@@ -1,9 +1,18 @@
 ﻿#include<iostream>
+#include <fstream>
+#include<string>
+#include<sstream>
 #include<opencv2/opencv.hpp>
 #include"./lib/akaze.h"
 
 using namespace cv;
 using namespace std;
+
+string itos(int i){
+    stringstream s;
+    s << i;
+    return s.str();
+}
 
 void akaze_compute_derivative_kernels(cv::OutputArray kx_, cv::OutputArray ky_,  const size_t dx, const size_t dy, const size_t scale);
 
@@ -20,7 +29,9 @@ BYTE* matToBytes(Mat image);
 Mat floatToMat(float** src, int rows, int cols);
 
 int main() {
-    Mat src = imread("C:\\Users\\tota1Noob\\Desktop\\lena.png", 0);
+    string file = "C:\\Users\\tota1Noob\\Desktop\\lena.png";
+    Mat rgb = imread(file);
+    Mat src = imread(file, 0);
     if (src.data == NULL) {
         cout << "Cannot openc the file!" << endl;
         return 1;
@@ -34,6 +45,81 @@ int main() {
     BYTE* imgTmp = matToBytes(src);
     Img tmp(imgTmp, orgRow, orgCol);
     //cout << compute_k_percentile(tmp, 0.7, 1.0, 300, 0, 0) << endl;
+
+
+
+    AKAZEOptions options;
+    options.img_height = tmp.rows; options.img_width = tmp.cols;
+    double total = getTickCount();
+    libAKAZE::AKAZE akaze(options);
+    akaze.Create_Nonlinear_Scale_Space(tmp);
+
+    vector<Keypoint> kpts;
+    akaze.Feature_Detection(kpts);
+
+    int size = kpts.size();
+    int t = (6 + 36 + 120) * 3;
+    int col = ceil(t / 8.);
+    BYTE** featureVector;
+    featureVector = new BYTE * [size];
+    for (int i = 0; i < size; ++i) {
+        featureVector[i] = new BYTE[col];
+        for (int j = 0; j < col; ++j) {
+            featureVector[i][j] = 0;
+        }
+    }
+    akaze.Compute_Descriptors(kpts, featureVector);
+    
+    total = getTickCount() - total;
+    printf("Total = %gms\n", total * 1000 / getTickFrequency());
+    akaze.Show_Computation_Times();
+
+    for (int i = 0; i < kpts.size(); ++i) {
+        cv::Point point;
+        point.x = kpts[i].pt.x;
+        point.y = kpts[i].pt.y;
+        cv::circle(rgb, point, 2, cv::Scalar(0, 255, 0), -1);
+    }
+    imshow("result", rgb);  
+
+    Ptr<AKAZE> detector = AKAZE::create();
+    vector<cv::KeyPoint> keypoints;
+    double t1 = getTickCount();
+    Mat descriptor;
+    detector->DESCRIPTOR_MLDB;
+    detector->detectAndCompute(image, Mat(), keypoints, descriptor);
+    double t2 = getTickCount();
+    double tkaze = 1000 * (t2 - t1) / getTickFrequency();
+    printf("AKAZE Time consume(ms) : %f\n", tkaze);
+
+    Mat keypointImg;
+    drawKeypoints(rgb, keypoints, keypointImg, Scalar::all(-1), DrawMatchesFlags::DEFAULT);
+    imshow("AKAZE key points", keypointImg);
+
+    int num = 0;
+    cout << size << " " << col << "\n" << keypoints.size() << " " << descriptor.cols << endl;
+    cout << keypoints[num].pt.x << " " << keypoints[num].pt.y << " " << keypoints[num].angle << endl;
+    for (int i = 0; i < 61; ++i) {
+        cout << (int)descriptor.ptr<uchar>(num)[i] << " ";
+    }
+    cout << endl;
+    cout << kpts[num].pt.x << " " << kpts[num].pt.y << " " << kpts[num].angle * 180 / 3.14159<< endl;
+    for (int i = 0; i < 61; ++i) {
+        cout << (int)featureVector[num][i] << " ";
+    }
+    cout << endl;
+
+    int count = 0;
+    for (int i = 0; i < keypoints.size(); ++i) {
+        for (int j = 0; j < kpts.size(); ++j) {
+            if (fabs(keypoints[i].pt.x - kpts[j].pt.x) < 0.5 && fabs(keypoints[i].pt.y - kpts[j].pt.y) < 0.5) {
+                count++; kpts.erase(kpts.begin() + j); --j; break;
+            }
+        }
+    }
+    cout << endl;
+    cout << count << endl;
+
 
     /*Mat dst;
     akaze_compute_scharr_derivatives(image, dst, 1, 0, 4);
@@ -83,7 +169,7 @@ int main() {
     dst.printImg();*/
 
 
-    Mat opencvScharr(cv::Size(orgCol, orgRow), CV_32F);
+    /*Mat opencvScharr(cv::Size(orgCol, orgRow), CV_32F);
     cv::GaussianBlur(image, opencvScharr, cv::Size(5, 5), 1.0, 1.0, cv::BORDER_REPLICATE);
     //cv::Scharr(image, opencvScharr, CV_32F, 0, 1, 1, 0, cv::BORDER_DEFAULT);
     imshow("opencv", opencvScharr);
@@ -96,7 +182,7 @@ int main() {
     Mat scharr = floatToMat(tmp2.data(), orgRow, orgCol);
     imshow("mine", scharr);
 
-    cout << matSimilarity(opencvScharr, scharr) << endl;
+    cout << matSimilarity(opencvScharr, scharr) << endl;*/
 
 
     /*int newRow = orgRow / 2,
@@ -120,7 +206,7 @@ int main() {
     cout << matSimilarity(half, myHalf) << endl;*/
 
     waitKey(0);
-
+    cout << "real end" << endl;
     return 0;
 }
 
@@ -200,12 +286,12 @@ float matSimilarity(const cv::Mat mat1, Img& mat2) {
     for (int i = 0; i < mat1.rows; ++i) {
         tmp = 0.;
         for (int j = 0; j < mat1.cols; ++j) {
-            if (mat1.ptr<float>(i)[j] == mat2.ptr(i)[j]) continue;
-            tmp += fabs(mat1.ptr<float>(i)[j] - mat2.ptr(i)[j]);
-            if (fabs(mat1.ptr<float>(i)[j] - mat2.ptr(i)[j]) > max) {
-                max = fabs(mat1.ptr<float>(i)[j] - mat2.ptr(i)[j]);
+            if (mat1.ptr<float>(i)[j] == mat2.pixels[i][j]) continue;
+            tmp += fabs(mat1.ptr<float>(i)[j] - mat2.pixels[i][j]);
+            if (fabs(mat1.ptr<float>(i)[j] - mat2.pixels[i][j]) > max) {
+                max = fabs(mat1.ptr<float>(i)[j] - mat2.pixels[i][j]);
                 maxi = i; maxj = j;
-                m1 = mat1.ptr<float>(i)[j]; m2 = mat2.ptr(i)[j];
+                m1 = mat1.ptr<float>(i)[j]; m2 = mat2.pixels[i][j];
             }
         }
         tmp /= (float)mat1.cols;

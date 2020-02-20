@@ -8,6 +8,10 @@
 struct ImgSize {
 	int height;
 	int width;
+	ImgSize(int a, int b) {
+		height = a;
+		width = b;
+	}
 };
 
 //Defined struct "Point" for point coordinates storage
@@ -17,9 +21,9 @@ struct Pointf {
 	float y;
 };
 
-//Defined class "KeyPoint" for key point storage
-//This is just a bad knock-off version of "KeyPoint" in OpenCV
-class KeyPoint {
+//Defined class "Keypoint" for key point storage
+//This is just a bad knock-off version of "Keypoint" in OpenCV
+class Keypoint {
 public:
 	Pointf pt;
 	float size;
@@ -27,30 +31,31 @@ public:
 	float response;
 	int octave;
 	int class_id;
-	KeyPoint();
-	~KeyPoint();
-	KeyPoint(float x, float y, float size, float angle, float response, int octave, int class_id);
-	KeyPoint(Pointf pt, float size, float angle, float response, int octave, int class_id);
+	Keypoint();
+	~Keypoint() {}
+	Keypoint(float x, float y, float size, float angle, float response, int octave, int class_id);
+	Keypoint(Pointf pt, float size, float angle, float response, int octave, int class_id);
 };
 
 //Defined class "Img" for image data storage,
 //where pixel values are kept in a 2D float array "pixels"
 //Number of columns and rows are defined as "cols" and "rows", respectively
 class Img {
-private:
-	float** pixels;
+	
 public:
+	float** pixels;
 	int cols;
 	int rows;
 	Img();
 	Img(BYTE* src, int rows, int cols);
 	Img(int rows, int cols);
 	Img(ImgSize size);
+	Img(const Img& a);
+	Img& operator=(const Img& a);
 	~Img();
 	void  create(int rows, int cols);
+	void  create(ImgSize size);
 	ImgSize size();
-	float* ptr(int row);
-	float get(int row, int col);
 	float** data();
 	void copyTo(Img& img);
 	void printImg();
@@ -64,7 +69,7 @@ void halfsample_image(Img& src, Img& dst);
 
 //Defined function "gaussian_2D_kernel" for the calculation of a gaussian kernel
 //of specified size
-float** gaussian_2D_kernel(int ksize_x, int ksize_y, float sigma);
+float* gaussian_2D_kernel(int ksize, float sigma);
 
 //Defined function "gaussian_2D_convolution" for gaussian blurring over a 2D array
 void gaussian_2D_convolution(Img& src, Img& dst, int ksize_x, int ksize_y, float sigma);
@@ -94,11 +99,17 @@ void compute_derivative_kernels(Img& kx, Img& ky, int dx, int dy, int scale);
 //Works as the name indicates
 void compute_scharr_derivatives(Img& src, Img& dst, int xorder, int yorder, int scale);
 
+/******************************************************************************************/
+/*Diffusivity functions*/
+
 //Defined four diffusivity functions, "pm_g1", "pm_g2", "weickert_diffusivity" and "charbonnier_diffusivity"
 void pm_g1(Img& Lx, Img& Ly, Img& dst, const float k);
 void pm_g2(Img& Lx, Img& Ly, Img& dst, const float k);
 void weickert_diffusivity(Img& Lx, Img& Ly, Img& dst, const float k);
 void charbonnier_diffusivity(Img& Lx, Img& Ly, Img& dst, const float k);
+
+/******************************************************************************************/
+/*FED implementation*/
 
 //Defined a series of functions
 //"fed_tau_by_process_time" returns the number of time steps per cycle or 0 on failure
@@ -107,3 +118,6 @@ int fed_tau_by_process_time(const float T, const int M, const float tau_max, con
 int fed_tau_by_cycle_time(const float t, const float tau_max, const bool reordering, std::vector<float>& tau);
 int fed_tau_internal(const int n, const float scale, const float tau_max, const bool reordering, std::vector<float>& tau);
 bool fed_is_prime_internal(const int number);
+
+
+void nld_step_scalar(Img& Ld, Img& c, Img& Lstep, const float stepsize);

@@ -1,6 +1,7 @@
 #pragma once
 #include"config.h"
 
+int Fea_3(BYTE* pImage, int iWid, int iHei, BYTE** fFea, int& iFea_num, int& iFea_dim);
 
 namespace libAKAZE {
 
@@ -61,7 +62,7 @@ namespace libAKAZE {
         void Do_Subpixel_Refinement(std::vector<Keypoint>& kpts);
 
         /// Feature description methods
-        void Compute_Descriptors(std::vector<Keypoint>& kpt, BYTE** desc);
+        int Compute_Descriptors(std::vector<Keypoint>& kpt, BYTE** desc);
 
         /// This method computes the main orientation for a given keypoint
         /// @param kpt Input keypoint
@@ -81,12 +82,6 @@ namespace libAKAZE {
 
         /// Do the binary comparisons to obtain the descriptor
         void MLDB_Binary_Comparisons(float* values, BYTE* desc, int count, int& dpos) const;
-
-        /// This method saves the scale space into jpg images
-        void Save_Scale_Space();
-
-        /// This method saves the feature detector responses of the nonlinear scale space into jpg images
-        void Save_Detector_Responses();
 
         /// Display timing information
         void Show_Computation_Times() const {
@@ -108,28 +103,6 @@ namespace libAKAZE {
         }
     };
 
-    /* ************************************************************************* */
-
-    /// This function sets default parameters for the A-KAZE detector
-    void setDefaultAKAZEOptions(AKAZEOptions& options);
-
-
-    /// This function computes a (quasi-random) list of bits to be taken
-    /// from the full descriptor. To speed the extraction, the function creates
-    /// a list of the samples that are involved in generating at least a bit (sampleList)
-    /// and a list of the comparisons between those samples (comparisons)
-    /// @param sampleList
-    /// @param comparisons The matrix with the binary comparisons
-    /// @param nbits The number of bits of the descriptor
-    /// @param pattern_size The pattern size for the binary descriptor
-    /// @param nchannels Number of channels to consider in the descriptor (1-3)
-    /// @note The function keeps the 18 bits (3-channels by 6 comparisons) of the
-    /// coarser grid, since it provides the most robust estimations
-    void generateDescriptorSubsample(Img& sampleList, Img& comparisons,
-        int nbits, int pattern_size, int nchannels);
-
-    /// This function checks descriptor limits for a given keypoint
-    inline void check_descriptor_limits(int& x, int& y, int width, int height);
 
     /// This function computes the value of a 2D Gaussian function
     inline float gaussian(float x, float y, float sigma) {

@@ -4,6 +4,23 @@
 using namespace std;
 using namespace libAKAZE;
 
+int Fea_3(BYTE* pImage, int iWid, int iHei, BYTE** fFea, int& iFea_num, int& iFea_dim) {
+    Img tmp(pImage, iHei, iWid);
+    AKAZEOptions options;
+    options.img_height = tmp.rows; options.img_width = tmp.cols;
+    libAKAZE::AKAZE akaze(options);
+    akaze.Create_Nonlinear_Scale_Space(tmp);
+    vector<Keypoint> kpts;
+    akaze.Feature_Detection(kpts);
+    int size = kpts.size();
+    BYTE** featureVector = NULL;
+    
+    akaze.Compute_Descriptors(kpts, featureVector);
+    akaze.Show_Computation_Times();
+    iFea_num = size;
+    return 0;
+}
+
 
 /* ************************************************************************* */
 AKAZE::AKAZE(const AKAZEOptions& options) : options(options) {
@@ -34,7 +51,7 @@ void AKAZE::Allocate_Memory_Evolution() {
     
     evolution.reserve(options.omax * options.nsublevels);
     int sizeCount = 0;
-   
+    
     for (int i = 0, power = 1; i <= options.omax - 1; ++i, power *= 2) {
         rfactor = 1.0f / power;
         level_height = (int)(options.img_height * rfactor);
@@ -44,9 +61,7 @@ void AKAZE::Allocate_Memory_Evolution() {
             options.omax = i;
             break;
         }
-
         for (int j = 0; j < options.nsublevels; ++j) {
-
             Evolution step;
             ImgSize size(level_height, level_width);
             step.Lx.create(size);
@@ -476,7 +491,7 @@ void AKAZE::Compute_Main_Orientation(Keypoint& kpt) const {
     }
 }
 
-void AKAZE::Get_MLDB_Full_Descriptor(const Keypoint& kpt, unsigned char* desc) const {
+void AKAZE::Get_MLDB_Full_Descriptor(const Keypoint& kpt, BYTE* desc) const {
 
     const int max_channels = 3;
     assert(options.descriptor_channels <= max_channels);
@@ -541,10 +556,10 @@ void AKAZE::MLDB_Fill_Values(float* values, int sample_step, int level,
                     nsamples++;
                 }
             }
-
-            di /= nsamples;
-            dx /= nsamples;
-            dy /= nsamples;
+            nsamples /= 1.0f;
+            di *= nsamples;
+            dx *= nsamples;
+            dy *= nsamples;
 
             values[valpos] = di;
 
@@ -559,7 +574,7 @@ void AKAZE::MLDB_Fill_Values(float* values, int sample_step, int level,
     }
 }
 
-void AKAZE::MLDB_Binary_Comparisons(float* values, unsigned char* desc,
+void AKAZE::MLDB_Binary_Comparisons(float* values, BYTE* desc,
     int count, int& dpos) const {
 
     int nr_channels = options.descriptor_channels;
@@ -576,19 +591,21 @@ void AKAZE::MLDB_Binary_Comparisons(float* values, unsigned char* desc,
     }
 }
 
-void AKAZE::Compute_Descriptors(std::vector<Keypoint>& kpts, BYTE** desc) {
+int AKAZE::Compute_Descriptors(std::vector<Keypoint>& kpts, BYTE** desc) {
 
     //double t1 = 0.0, t2 = 0.0;
 
     //t1 = cv::getTickCount();
 
+    clock_t t1 = clock();
 
     for (int i = 0; i < (int)(kpts.size()); i++) {
         Compute_Main_Orientation(kpts[i]);
         Get_MLDB_Full_Descriptor(kpts[i], desc[i]);
     }
-
-
+    clock_t t2 = clock();
+    timing.descriptor = 1000 * (t2 - t1) / (double)CLOCKS_PER_SEC;
+    return kpts.size();
     //t2 = cv::getTickCount();
     //timing_.descriptor = 1000.0 * (t2 - t1) / cv::getTickFrequency();
 }

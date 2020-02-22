@@ -28,9 +28,29 @@ BYTE* matToBytes(Mat image);
 
 Mat floatToMat(float** src, int rows, int cols);
 
+Mat byteToMat(BYTE** src, int row, int col);
+
+KeyPoint keypointToKeyPoint(Keypoint kpt);
+
+void matches2points_nndr(const std::vector<cv::KeyPoint>& train,
+    const std::vector<cv::KeyPoint>& query,
+    const std::vector<std::vector<cv::DMatch> >& matches,
+    std::vector<cv::Point2f>& pmatches, float nndr);
+
+void compute_inliers_ransac(const std::vector<cv::Point2f>& matches,
+    std::vector<cv::Point2f>& inliers,
+    float error, bool use_fund);
+
+void draw_keypoints(cv::Mat& img, const std::vector<cv::KeyPoint>& kpts);
+
+void draw_inliers(const cv::Mat& img1, const cv::Mat& img2, cv::Mat& img_com,
+    const std::vector<cv::Point2f>& ptpairs);
+
 int main() {
-    string file = "C:\\Users\\tota1Noob\\Desktop\\lena.png";
+    string file = "C:\\Users\\tota1Noob\\Desktop\\Graffiti.png";
     Mat rgb = imread(file);
+    Mat rgb2;
+    rgb.copyTo(rgb2);
     Mat src = imread(file, 0);
     if (src.data == NULL) {
         cout << "Cannot openc the file!" << endl;
@@ -47,8 +67,113 @@ int main() {
     //cout << compute_k_percentile(tmp, 0.7, 1.0, 300, 0, 0) << endl;
 
 
-
+    double t1 = getTickCount();
     AKAZEOptions options;
+    options.img_height = tmp.rows; options.img_width = tmp.cols;
+    libAKAZE::AKAZE akaze(options);
+    akaze.Create_Nonlinear_Scale_Space(tmp);
+    vector<Keypoint> kpts;
+    akaze.Feature_Detection(kpts);
+    int t = (6 + 36 + 120) * options.descriptor_channels;
+    int col = ceil(t / 8.), size = kpts.size();
+    BYTE** featureVector = new BYTE * [size];
+    for (int i = 0; i < size; ++i) {
+        featureVector[i] = new BYTE[col];
+        for (int j = 0; j < col; ++j) {
+            featureVector[i][j] = 0;
+        }
+    }
+    akaze.Compute_Descriptors(kpts, featureVector);
+    cout << "First done in " << 1000 * (getTickCount() - t1) / getTickFrequency() << "ms" << endl;
+    
+
+    string file2 = "C:\\Users\\tota1Noob\\Desktop\\testGraffiti.png";
+    Mat match = imread(file2, 0);
+    BYTE* byte2 = matToBytes(match);
+    Img tmp2(byte2, match.rows, match.cols);
+    t1 = getTickCount();
+    AKAZEOptions options2;
+    options2.img_height = tmp2.rows; options2.img_width = tmp2.cols;
+    libAKAZE::AKAZE akaze2(options2);
+    akaze2.Create_Nonlinear_Scale_Space(tmp2);
+    vector<Keypoint> kpts2;
+    akaze2.Feature_Detection(kpts2);
+    int size2 = kpts2.size();
+    BYTE** featureVector2 = new BYTE * [size2];
+    for (int i = 0; i < size2; ++i) {
+        featureVector2[i] = new BYTE[col];
+        for (int j = 0; j < col; ++j) {
+            featureVector2[i][j] = 0;
+        }
+    }
+    akaze2.Compute_Descriptors(kpts2, featureVector2);
+    cout << "Second done in " << 1000 * (getTickCount() - t1) / getTickFrequency() << "ms" << endl;
+
+    vector<KeyPoint> cvkpt1;
+    for (int i = 0; i < size; ++i) {
+        cvkpt1.push_back(keypointToKeyPoint(kpts[i]));
+    }
+    vector<KeyPoint> cvkpt2;
+    for (int i = 0; i < size2; ++i) {
+        cvkpt2.push_back(keypointToKeyPoint(kpts2[i]));
+    }
+    
+    Mat desc1 = byteToMat(featureVector, size, 61);
+    Mat desc2 = byteToMat(featureVector2, size2, 61);
+    vector<vector<cv::DMatch> > dmatches;
+    // Matching Descriptors!!
+    vector<cv::Point2f> matches, inliers;
+    cv::Ptr<cv::DescriptorMatcher> matcher_l1 = cv::DescriptorMatcher::create("BruteForce-Hamming");
+
+    matcher_l1->knnMatch(desc1, desc2, dmatches, 2);
+
+    // Compute Inliers!!
+    matches2points_nndr(cvkpt1, cvkpt2, dmatches, matches, 0.80f);
+
+    compute_inliers_ransac(matches, inliers, 2.50f, false);
+
+    // Compute the inliers statistics
+    int nkpts1 = kpts.size();
+    int nkpts2 = kpts2.size();
+    int nmatches = matches.size() / 2;
+    int ninliers = inliers.size() / 2;
+    int noutliers = nmatches - ninliers;
+    float ratio = 100.0 * ((float)ninliers / (float)nmatches);
+
+    Mat img1_rgb, img2_rgb;
+    img1_rgb = cv::Mat(cv::Size(src.cols, src.rows), CV_8UC3);
+    img2_rgb = cv::Mat(cv::Size(match.cols, match.rows), CV_8UC3);
+    Mat img_com = cv::Mat(cv::Size(src.cols + match.cols, src.rows), CV_8UC3);
+    //img1_rgb = imread(file); img2_rgb = imread(file2);
+
+    if (options.show_results == true) {
+
+        // Prepare the visualization
+        cvtColor(src, img1_rgb, cv::COLOR_GRAY2BGR);
+        cvtColor(match, img2_rgb, cv::COLOR_GRAY2BGR);
+
+        // Show matching statistics
+        cout << "Number of Keypoints Image 1: " << nkpts1 << endl;
+        cout << "Number of Keypoints Image 2: " << nkpts2 << endl;
+        cout << "Number of Matches: " << nmatches << endl;
+        cout << "Number of Inliers: " << ninliers << endl;
+        cout << "Number of Outliers: " << noutliers << endl;
+        cout << "Inliers Ratio: " << ratio << endl << endl;
+
+        //draw_keypoints(img1_rgb, cvkpt1);
+        //draw_keypoints(img2_rgb, cvkpt2);
+        //imshow("pic1", img1_rgb);
+        //imshow("pic2", img2_rgb);
+        draw_inliers(img1_rgb, img2_rgb, img_com, inliers);
+        //cv::namedWindow("Inliers", cv::WINDOW_AUTO);
+        cv::imshow("Inliers", img_com);
+        cv::waitKey(0);
+    }
+   
+    
+    
+    
+    /*AKAZEOptions options;
     options.img_height = tmp.rows; options.img_width = tmp.cols;
     double total = getTickCount();
     libAKAZE::AKAZE akaze(options);
@@ -56,12 +181,11 @@ int main() {
 
     vector<Keypoint> kpts;
     akaze.Feature_Detection(kpts);
+ 
 
-    int size = kpts.size();
-    int t = (6 + 36 + 120) * 3;
-    int col = ceil(t / 8.);
-    BYTE** featureVector;
-    featureVector = new BYTE * [size];
+    int t = (6 + 36 + 120) * options.descriptor_channels;
+    int col = ceil(t / 8.), size = kpts.size();
+    BYTE** featureVector = new BYTE * [size];
     for (int i = 0; i < size; ++i) {
         featureVector[i] = new BYTE[col];
         for (int j = 0; j < col; ++j) {
@@ -78,7 +202,7 @@ int main() {
         cv::Point point;
         point.x = kpts[i].pt.x;
         point.y = kpts[i].pt.y;
-        cv::circle(rgb, point, 2, cv::Scalar(0, 255, 0), -1);
+        cv::circle(rgb, point, 4, cv::Scalar(0, 255, 0), -1);
     }
     imshow("result", rgb);  
 
@@ -87,13 +211,14 @@ int main() {
     double t1 = getTickCount();
     Mat descriptor;
     detector->DESCRIPTOR_MLDB;
+    //detector->setDescriptorSize(1);
     detector->detectAndCompute(image, Mat(), keypoints, descriptor);
     double t2 = getTickCount();
     double tkaze = 1000 * (t2 - t1) / getTickFrequency();
     printf("AKAZE Time consume(ms) : %f\n", tkaze);
 
     Mat keypointImg;
-    drawKeypoints(rgb, keypoints, keypointImg, Scalar::all(-1), DrawMatchesFlags::DEFAULT);
+    drawKeypoints(rgb2, keypoints, keypointImg, Scalar::all(-1), DrawMatchesFlags::DEFAULT);
     imshow("AKAZE key points", keypointImg);
 
     int num = 0;
@@ -112,13 +237,21 @@ int main() {
     int count = 0;
     for (int i = 0; i < keypoints.size(); ++i) {
         for (int j = 0; j < kpts.size(); ++j) {
-            if (fabs(keypoints[i].pt.x - kpts[j].pt.x) < 0.5 && fabs(keypoints[i].pt.y - kpts[j].pt.y) < 0.5) {
+            if (fabs(keypoints[i].pt.x - kpts[j].pt.x) < 0.1 && fabs(keypoints[i].pt.y - kpts[j].pt.y) < 0.1) {
                 count++; kpts.erase(kpts.begin() + j); --j; break;
             }
         }
     }
+
+    for (int i = 0; i < kpts.size(); ++i) {
+        cv::Point point;
+        point.x = kpts[i].pt.x;
+        point.y = kpts[i].pt.y;
+        cv::circle(rgb, point, 4, cv::Scalar(255, 0, 0), -1);
+    }
+    imshow("result", rgb);
     cout << endl;
-    cout << count << endl;
+    cout << count << endl;*/
 
 
     /*Mat dst;
@@ -341,4 +474,137 @@ Mat floatToMat(float** src, int rows, int cols) {
         }
     }
     return tmp;
+}
+
+Mat byteToMat(BYTE** src, int row, int col) {
+
+    int nType = CV_8UC1;
+    Mat outImg = Mat::zeros(row, col, nType);
+    for (int i = 0; i < row; ++i) {
+        for (int j = 0; j < col; ++j) {
+            outImg.ptr<uchar>(i)[j] = src[i][j];
+        }
+    }
+    return outImg;
+}
+
+KeyPoint keypointToKeyPoint(Keypoint kpt) {
+    KeyPoint tmp;
+    tmp.angle = kpt.angle;
+    tmp.class_id = kpt.class_id;
+    tmp.octave = kpt.octave;
+    tmp.pt.x = kpt.pt.x;
+    tmp.pt.y = kpt.pt.y;
+    tmp.response = kpt.response;
+    tmp.size = kpt.size;
+    return tmp;
+}
+
+void matches2points_nndr(const std::vector<cv::KeyPoint>& train,
+    const std::vector<cv::KeyPoint>& query,
+    const std::vector<std::vector<cv::DMatch> >& matches,
+    std::vector<cv::Point2f>& pmatches, float nndr) {
+
+    float dist1 = 0.0, dist2 = 0.0;
+    for (size_t i = 0; i < matches.size(); i++) {
+        cv::DMatch dmatch = matches[i][0];
+        dist1 = matches[i][0].distance;
+        dist2 = matches[i][1].distance;
+
+        if (dist1 < nndr * dist2) {
+            pmatches.push_back(train[dmatch.queryIdx].pt);
+            pmatches.push_back(query[dmatch.trainIdx].pt);
+        }
+    }
+}
+
+void compute_inliers_ransac(const std::vector<cv::Point2f>& matches,
+    std::vector<cv::Point2f>& inliers,
+    float error, bool use_fund) {
+
+    vector<cv::Point2f> points1, points2;
+    cv::Mat H = cv::Mat::zeros(3, 3, CV_32F);
+    int npoints = matches.size() / 2;
+    cv::Mat status = cv::Mat::zeros(npoints, 1, CV_8UC1);
+
+    for (size_t i = 0; i < matches.size(); i += 2) {
+        points1.push_back(matches[i]);
+        points2.push_back(matches[i + 1]);
+    }
+
+    if (npoints > 8) {
+        if (use_fund == true)
+            H = cv::findFundamentalMat(points1, points2, cv::FM_RANSAC, error, 0.99, status);
+        else
+            H = cv::findHomography(points1, points2, cv::RANSAC, error, status);
+
+        for (int i = 0; i < npoints; i++) {
+            if (status.at<unsigned char>(i) == 1) {
+                inliers.push_back(points1[i]);
+                inliers.push_back(points2[i]);
+            }
+        }
+    }
+}
+
+void draw_keypoints(cv::Mat& img, const std::vector<cv::KeyPoint>& kpts) {
+
+    int x = 0, y = 0;
+    float radius = 0.0;
+    for (size_t i = 0; i < kpts.size(); i++) {
+        x = (int)(kpts[i].pt.x + .5);
+        y = (int)(kpts[i].pt.y + .5);
+        radius = kpts[i].size / 2.0;
+        cv::circle(img, cv::Point(x, y), radius * 2.50, cv::Scalar(0, 255, 0), 1);
+        cv::circle(img, cv::Point(x, y), 1.0, cv::Scalar(0, 0, 255), -1);
+    }
+}
+
+void draw_inliers(const cv::Mat& img1, const cv::Mat& img2, cv::Mat& img_com,
+    const std::vector<cv::Point2f>& ptpairs) {
+
+    int x1 = 0, y1 = 0, x2 = 0, y2 = 0;
+    float rows1 = 0.0, cols1 = 0.0;
+    float rows2 = 0.0, cols2 = 0.0;
+    float ufactor = 0.0, vfactor = 0.0;
+
+    rows1 = img1.rows;
+    cols1 = img1.cols;
+    rows2 = img2.rows;
+    cols2 = img2.cols;
+    ufactor = (float)(cols1) / (float)(cols2);
+    vfactor = (float)(rows1) / (float)(rows2);
+
+    // This is in case the input images don't have the same resolution
+    //cv::Mat img_aux = cv::Mat(cv::Size(img1.cols, img1.rows), CV_8UC3);
+    //cv::resize(img2, img_aux, cv::Size(img1.cols, img1.rows), 0, 0, cv::INTER_LINEAR);
+
+    for (int i = 0; i < img_com.rows; i++) {
+        for (int j = 0; j < img_com.cols; j++) {
+            if (j < img1.cols) {
+                *(img_com.ptr<unsigned char>(i) + 3 * j) = *(img1.ptr<unsigned char>(i) + 3 * j);
+                *(img_com.ptr<unsigned char>(i) + 3 * j + 1) = *(img1.ptr<unsigned char>(i) + 3 * j + 1);
+                *(img_com.ptr<unsigned char>(i) + 3 * j + 2) = *(img1.ptr<unsigned char>(i) + 3 * j + 2);
+            }
+            else {
+                if (i < img2.rows) {
+                    int tmp = j - img1.cols;
+                    *(img_com.ptr<unsigned char>(i) + 3 * j) = *(img2.ptr<unsigned char>(i) + 3 * tmp);
+                    *(img_com.ptr<unsigned char>(i) + 3 * j + 1) = *(img2.ptr<unsigned char>(i) + 3 * tmp + 1);
+                    *(img_com.ptr<unsigned char>(i) + 3 * j + 2) = *(img2.ptr<unsigned char>(i) + 3 * tmp + 2);
+                }
+                
+            }
+        }
+    }
+
+    for (size_t i = 0; i < ptpairs.size(); i += 2) {
+        x1 = (int)(ptpairs[i].x + .5);
+        y1 = (int)(ptpairs[i].y + .5);
+        x2 = (int)(ptpairs[i + 1].x + img1.cols + .5);
+        y2 = (int)(ptpairs[i + 1].y + .5);
+        cv::circle(img_com, cv::Point(x1, y1), 2, cv::Scalar(0, 0, 255), -1);
+        cv::circle(img_com, cv::Point(x2, y2), 2, cv::Scalar(0, 0, 255), -1);
+        cv::line(img_com, cv::Point(x1, y1), cv::Point(x2, y2), cv::Scalar(0, 255, 0), 1);
+    }
 }

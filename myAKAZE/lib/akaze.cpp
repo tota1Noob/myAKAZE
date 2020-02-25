@@ -4,44 +4,59 @@
 using namespace std;
 using namespace libAKAZE;
 
-int Fea_3(BYTE* pImage, int iWid, int iHei, BYTE** fFea, int& iFea_num, int& iFea_dim) {
+int Fea_3(BYTE* pImage, int iWid, int iHei, float**& fFea, int& iFea_num, int& iFea_dim) {
     Img tmp(pImage, iHei, iWid);
     AKAZEOptions options;
     options.img_height = tmp.rows; options.img_width = tmp.cols;
+    //Initializing
     libAKAZE::AKAZE akaze(options);
-    akaze.Create_Nonlinear_Scale_Space(tmp);
+    //Creating scale space
+    if (akaze.Create_Nonlinear_Scale_Space(tmp) != 0) {
+        return 1;
+    }
+    //Getting keypoints
     vector<Keypoint> kpts;
     akaze.Feature_Detection(kpts);
+    //Computing descriptors
     int size = kpts.size();
-    BYTE** featureVector = NULL;
-    
+    int t = (6 + 36 + 120) * options.descriptor_channels;
+    int col = ceil(t / 8.);
+    BYTE** featureVector = new BYTE * [size];
+    for (int i = 0; i < size; ++i) {
+        featureVector[i] = new BYTE[col];
+        for (int j = 0; j < col; ++j) {
+            featureVector[i][j] = 0;
+        }
+    }   
     akaze.Compute_Descriptors(kpts, featureVector);
-    akaze.Show_Computation_Times();
+
+    fFea = new float* [size];
+    for (int i = 0; i < size; ++i) {
+        fFea[i] = new float[col + 2];
+        fFea[i][0] = kpts[i].pt.x;
+        fFea[i][1] = kpts[i].pt.y;
+        for (int j = 2; j < col + 2; ++j) {
+            fFea[i][j] = (float)featureVector[i][j - 2];
+        }
+    }
+
     iFea_num = size;
+    iFea_dim = col;
     return 0;
 }
 
 
-/* ************************************************************************* */
 AKAZE::AKAZE(const AKAZEOptions& options) : options(options) {
 
     ncycles = 0;
-    reordering = true;
-
-    /*if (options.descriptor_size > 0 && options.descriptor >= MLDB_UPRIGHT) {
-        generateDescriptorSubsample(descriptorSamples_, descriptorBits_, options.descriptor_size,
-            options.descriptor_pattern_size, options.descriptor_channels);
-    }*/
-    
+    reordering = true;    
     Allocate_Memory_Evolution();
 }
 
-/* ************************************************************************* */
 AKAZE::~AKAZE() {
     evolution.clear();
 }
 
-/* ************************************************************************* */
 void AKAZE::Allocate_Memory_Evolution() {
     clock_t t1 = clock();
     float rfactor = 0.0;
@@ -101,7 +116,6 @@ void AKAZE::Allocate_Memory_Evolution() {
     timing.initialize = 1000 * (t2 - t1) / (double)CLOCKS_PER_SEC;
 }
 
-/* ************************************************************************* */
 int AKAZE::Create_Nonlinear_Scale_Space(Img& img) {
 
 
@@ -202,8 +216,6 @@ void AKAZE::Compute_Determinant_Hessian_Response() {
     // Firstly compute the multiscale derivatives
     Compute_Multiscale_Derivatives();
     for (size_t i = 0; i < evolution.size(); i++) {
-        if (options.verbosity == true)
-            cout << "Computing detector response. Determinant of Hessian. Evolution time: " << evolution[i].etime << endl;
 
         float ratio = pow(2.0f, (float)evolution[i].octave);
         int sigma_size = fRound(evolution[i].esigma * options.derivative_factor / ratio);
@@ -356,7 +368,6 @@ void AKAZE::Find_Scale_Space_Extrema(std::vector<Keypoint>& kpts) {
     timing.extrema = 1000 * (t2 - t1) / (double)CLOCKS_PER_SEC;
 }
 
-/* ************************************************************************* */
 void AKAZE::Do_Subpixel_Refinement(std::vector<Keypoint>& kpts) {
 
     float Dx = 0.0, Dy = 0.0, ratio = 0.0;
@@ -398,7 +409,7 @@ void AKAZE::Do_Subpixel_Refinement(std::vector<Keypoint>& kpts) {
         A.pixels[1][1] = Dyy;
         A.pixels[1][0] = Dxy;
         A.pixels[0][1] = Dxy;
-        b.pixels[0][0] = -Dx;
+        b.pixels[0][0] = -Dx; 
         b.pixels[1][0] = -Dy;
 
         solve(A, b, dst);
@@ -592,11 +603,6 @@ void AKAZE::MLDB_Binary_Comparisons(float* values, BYTE* desc,
 }
 
 int AKAZE::Compute_Descriptors(std::vector<Keypoint>& kpts, BYTE** desc) {
-
-    //double t1 = 0.0, t2 = 0.0;
-
-    //t1 = cv::getTickCount();
-
     clock_t t1 = clock();
 
     for (int i = 0; i < (int)(kpts.size()); i++) {
@@ -606,6 +612,4 @@ int AKAZE::Compute_Descriptors(std::vector<Keypoint>& kpts, BYTE** desc) {
     clock_t t2 = clock();
     timing.descriptor = 1000 * (t2 - t1) / (double)CLOCKS_PER_SEC;
     return kpts.size();
-    //t2 = cv::getTickCount();
-    //timing_.descriptor = 1000.0 * (t2 - t1) / cv::getTickFrequency();
 }

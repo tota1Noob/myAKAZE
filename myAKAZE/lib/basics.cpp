@@ -1,6 +1,6 @@
 #define _USE_MATH_DEFINES
 #include<iostream>
-#include< ctime >
+#include<ctime>
 #include<vector>
 #include<cmath>
 #include"basics.h"

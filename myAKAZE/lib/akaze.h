@@ -1,7 +1,9 @@
 #pragma once
 #include"config.h"
 
-int Fea_3(BYTE* pImage, int iWid, int iHei, BYTE** fFea, int& iFea_num, int& iFea_dim);
+//If return value is 1, scale space initialization must have failed.
+//Return 0 and it works fine.
+int Fea_3(BYTE* pImage, int iWid, int iHei, float**& fFea, int& iFea_num, int& iFea_dim);
 
 namespace libAKAZE {
 
@@ -10,7 +12,7 @@ namespace libAKAZE {
     private:
 
         AKAZEOptions options;                      ///< Configuration options for AKAZE
-        //std::vector<TEvolution> evolution_;         ///< Vector of nonlinear diffusion evolution
+        std::vector<Evolution> evolution;         ///< Vector of nonlinear diffusion evolution
 
         /// FED parameters
         int ncycles;                               ///< Number of cycles
@@ -27,7 +29,6 @@ namespace libAKAZE {
         AKAZETiming timing;
 
     public:
-        std::vector<Evolution> evolution;
         /// AKAZE constructor with input options
         /// @param options AKAZE configuration options
         /// @note This constructor allocates memory for the nonlinear scale space

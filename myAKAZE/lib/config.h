@@ -2,8 +2,7 @@
 #include <string>
 #include <vector>
 #include <cmath>
-#include <bitset>
-#include <iomanip>
+#include <ctime>
 #include "basics.h"
 
 /// Lookup table for 2d gaussian (sigma = 2.5) where (0,0) is top left and (6,6) is bottom right
@@ -61,7 +60,6 @@ struct AKAZEOptions {
         min_dthreshold = 0.00001f;
 
         diffusivity = PM_G2;
-        descriptor_size = 0;
         descriptor_channels = 3;
         descriptor_pattern_size = 10;
         sderivatives = 1.0;
@@ -69,11 +67,6 @@ struct AKAZEOptions {
         kcontrast = 0.001f;
         kcontrast_percentile = 0.7f;
         kcontrast_nbins = 300;
-
-        save_scale_space = false;
-        save_keypoints = false;
-        show_results = true;
-        verbosity = false;
     }
 
     int omin;                       ///< Initial octave level (-1 means that the size of the input image is duplicated)
@@ -89,46 +82,12 @@ struct AKAZEOptions {
     float dthreshold;               ///< Detector response threshold to accept point
     float min_dthreshold;           ///< Minimum detector threshold to accept a point
 
-    int descriptor_size;            ///< Size of the descriptor in bits. 0->Full size
     int descriptor_channels;        ///< Number of channels in the descriptor (1, 2, 3)
     int descriptor_pattern_size;    ///< Actual patch size is 2*pattern_size*point.scale
 
     float kcontrast;                ///< The contrast factor parameter
     float kcontrast_percentile;     ///< Percentile level for the contrast factor
     size_t kcontrast_nbins;         ///< Number of bins for the contrast factor histogram
-
-    bool save_scale_space;          ///< Set to true for saving the scale space images
-    bool save_keypoints;            ///< Set to true for saving the detected keypoints and descriptors
-    bool show_results;              ///< Set to true for displaying results
-    bool verbosity;                 ///< Set to true for displaying verbosity information
-
-    /*friend std::ostream& operator<<(std::ostream& os,
-        const AKAZEOptions& akaze_options) {
-
-        os << std::left;
-#define CHECK_AKAZE_OPTION(option) \
-  os << std::setw(33) << #option << " =  " << option << std::endl
-
-        // Scale-space parameters.
-        CHECK_AKAZE_OPTION(akaze_options.omax);
-        CHECK_AKAZE_OPTION(akaze_options.nsublevels);
-        CHECK_AKAZE_OPTION(akaze_options.soffset);
-        CHECK_AKAZE_OPTION(akaze_options.sderivatives);
-        CHECK_AKAZE_OPTION(akaze_options.diffusivity);
-        // Detection parameters.
-        CHECK_AKAZE_OPTION(akaze_options.dthreshold);
-        // Descriptor parameters.
-        CHECK_AKAZE_OPTION(akaze_options.descriptor);
-        CHECK_AKAZE_OPTION(akaze_options.descriptor_channels);
-        CHECK_AKAZE_OPTION(akaze_options.descriptor_size);
-        // Save scale-space
-        CHECK_AKAZE_OPTION(akaze_options.save_scale_space);
-        // Verbose option for debug.
-        CHECK_AKAZE_OPTION(akaze_options.verbosity);
-#undef CHECK_AKAZE_OPTIONS
-
-        return os;
-    }*/
 };
 
 /* ************************************************************************* */
